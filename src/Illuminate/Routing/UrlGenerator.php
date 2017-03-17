@@ -3,6 +3,7 @@
 namespace Illuminate\Routing;
 
 use Closure;
+use Illuminate\Contracts\Routing\UrlInformation;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
@@ -17,7 +18,7 @@ class UrlGenerator implements UrlGeneratorContract
     /**
      * The route collection.
      *
-     * @var \Illuminate\Routing\RouteCollection
+     * @var \Illuminate\Contracts\Routing\UrlInformation
      */
     protected $routes;
 
@@ -94,11 +95,11 @@ class UrlGenerator implements UrlGeneratorContract
     /**
      * Create a new URL Generator instance.
      *
-     * @param  \Illuminate\Routing\RouteCollection  $routes
+     * @param  \Illuminate\Contracts\Routing\UrlInformation  $routes
      * @param  \Illuminate\Http\Request  $request
      * @return void
      */
-    public function __construct(RouteCollection $routes, Request $request)
+    public function __construct(UrlInformation $routes, Request $request)
     {
         $this->routes = $routes;
 

@@ -872,6 +872,46 @@ class Application extends Container implements ApplicationContract, HttpKernelIn
     }
 
     /**
+     * Determine if the application routes are cached.
+     *
+     * @return bool
+     */
+    public function requestDispatcherIsCached()
+    {
+        return $this['files']->exists($this->getCachedRequestDispatcherPath());
+    }
+
+    /**
+     * Get the path to the cached request dispatcher.
+     *
+     * @return string
+     */
+    public function getCachedRequestDispatcherPath()
+    {
+        return $this->bootstrapPath().'/cache/requestDispatcher.php';
+    }
+
+    /**
+     * Determine if the url information cached.
+     *
+     * @return bool
+     */
+    public function urlInformationIsCached()
+    {
+        return $this['files']->exists($this->getCachedUrlInformationPath());
+    }
+
+    /**
+     * Get the path to the cached url information.
+     *
+     * @return string
+     */
+    public function getCachedUrlInformationPath()
+    {
+        return $this->bootstrapPath().'/cache/urlInformation.php';
+    }
+
+    /**
      * Determine if the application is currently down for maintenance.
      *
      * @return bool
@@ -1094,6 +1134,7 @@ class Application extends Container implements ApplicationContract, HttpKernelIn
             'redirect'             => [\Illuminate\Routing\Redirector::class],
             'redis'                => [\Illuminate\Redis\RedisManager::class, \Illuminate\Contracts\Redis\Factory::class],
             'request'              => [\Illuminate\Http\Request::class, \Symfony\Component\HttpFoundation\Request::class],
+            'request.dispatcher'   => [\Illuminate\Contracts\Routing\RouteBindingSubstitutor::class],
             'router'               => [\Illuminate\Routing\Router::class, \Illuminate\Contracts\Routing\Registrar::class, \Illuminate\Contracts\Routing\BindingRegistrar::class],
             'session'              => [\Illuminate\Session\SessionManager::class],
             'session.store'        => [\Illuminate\Session\Store::class, \Illuminate\Contracts\Session\Session::class],

@@ -4,6 +4,8 @@ namespace Illuminate\Routing;
 
 use Countable;
 use ArrayIterator;
+use Illuminate\Contracts\Container\Container;
+use Illuminate\Contracts\Routing\UrlInformation;
 use IteratorAggregate;
 use Illuminate\Support\Arr;
 use Illuminate\Http\Request;
@@ -11,7 +13,7 @@ use Illuminate\Http\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
-class RouteCollection implements Countable, IteratorAggregate
+class RouteCollection implements Countable, IteratorAggregate, UrlInformation
 {
     /**
      * An array of the routes keyed by method.
@@ -136,7 +138,7 @@ class RouteCollection implements Countable, IteratorAggregate
      *
      * @throws \Symfony\Component\HttpKernel\Exception\NotFoundHttpException
      */
-    public function match(Request $request)
+    public function match(Request $request, Container $container)
     {
         $routes = $this->get($request->getMethod());
 
@@ -146,7 +148,8 @@ class RouteCollection implements Countable, IteratorAggregate
         $route = $this->matchAgainstRoutes($routes, $request);
 
         if (! is_null($route)) {
-            return $route->bind($request);
+            return $route->setContainer($container)
+                ->bind($request);
         }
 
         // If no route was found we will now check if a matching route is specified by
@@ -171,7 +174,7 @@ class RouteCollection implements Countable, IteratorAggregate
      */
     protected function matchAgainstRoutes(array $routes, $request, $includingMethod = true)
     {
-        return Arr::first($routes, function ($value) use ($request, $includingMethod) {
+        return Arr::first($routes, function (Route $value) use ($request, $includingMethod) {
             return $value->matches($request, $includingMethod);
         });
     }

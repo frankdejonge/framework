@@ -31,13 +31,7 @@ class RouteCompiler
      */
     public function compile()
     {
-        $optionals = $this->getOptionalParameters();
-
-        $uri = preg_replace('/\{(\w+?)\?\}/', '{$1}', $this->route->uri());
-
-        return (
-            new SymfonyRoute($uri, $optionals, $this->route->wheres, [], $this->route->domain() ?: '')
-        )->compile();
+        return $this->createSymfonyRoute()->compile();
     }
 
     /**
@@ -49,6 +43,39 @@ class RouteCompiler
     {
         preg_match_all('/\{(\w+?)\?\}/', $this->route->uri(), $matches);
 
-        return isset($matches[1]) ? array_fill_keys($matches[1], null) : [];
+        $optionals = isset($matches[1]) ? array_fill_keys($matches[1], null) : [];
+
+        $optionals['_action'] = $this->route->action;
+
+        return $optionals;
+    }
+
+    /**
+     * Get the information needed to generate a route.
+     *
+     * @return array
+     */
+    public function getRouteInformation()
+    {
+        return [
+            'uri' => $this->route->uri,
+            'methods' => $this->route->methods(),
+            'defaults' => $this->route->defaults,
+            'wheres' => $this->route->wheres,
+            'parameters' => ['_action' => $this->route->action],
+            'domain' => $this->route->domain() ?: ''
+        ];
+    }
+
+    /**
+     * @return SymfonyRoute
+     */
+    public function createSymfonyRoute()
+    {
+        $optionals = $this->getOptionalParameters();
+
+        $uri = preg_replace('/\{(\w+?)\?\}/', '{$1}', $this->route->uri());
+
+        return new SymfonyRoute($uri, $optionals, $this->route->wheres, [], $this->route->domain() ?: '');
     }
 }

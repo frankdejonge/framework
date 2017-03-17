@@ -22,6 +22,11 @@ class Kernel implements KernelContract
     protected $app;
 
     /**
+     * @var \Illuminate\Contracts\Routing\RequestDispatcher
+     */
+    protected $dispatcher;
+
+    /**
      * The router instance.
      *
      * @var \Illuminate\Routing\Router
@@ -83,23 +88,30 @@ class Kernel implements KernelContract
      * Create a new HTTP kernel instance.
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
-     * @param  \Illuminate\Routing\Router  $router
      * @return void
      */
-    public function __construct(Application $app, Router $router)
+    public function __construct(Application $app)
     {
         $this->app = $app;
-        $this->router = $router;
+    }
 
-        $router->middlewarePriority = $this->middlewarePriority;
+    protected function registerMiddlewareGroups()
+    {
+        $bindMiddleware = function ($middlewareAware) {
+            $middlewareAware->middlewarePriority = $this->middlewarePriority;
 
-        foreach ($this->middlewareGroups as $key => $middleware) {
-            $router->middlewareGroup($key, $middleware);
-        }
+            foreach ($this->middlewareGroups as $key => $middleware) {
+                $middlewareAware->middlewareGroup($key, $middleware);
+            }
 
-        foreach ($this->routeMiddleware as $key => $middleware) {
-            $router->aliasMiddleware($key, $middleware);
-        }
+            foreach ($this->routeMiddleware as $key => $middleware) {
+                $middlewareAware->aliasMiddleware($key, $middleware);
+            }
+        };
+        
+        $this->app->resolving('router', $bindMiddleware);
+        
+        $this->app->resolving('request.dispatcher', $bindMiddleware);
     }
 
     /**
@@ -110,6 +122,8 @@ class Kernel implements KernelContract
      */
     public function handle($request)
     {
+        $this->registerMiddlewareGroups();
+
         try {
             $request->enableHttpMethodParameterOverride();
 
@@ -171,7 +185,9 @@ class Kernel implements KernelContract
         return function ($request) {
             $this->app->instance('request', $request);
 
-            return $this->router->dispatch($request);
+            $this->dispatcher  = $dispatcher = $this->app['request.dispatcher'];
+
+            return $dispatcher->dispatch($request, $this->app);
         };
     }
 
@@ -227,7 +243,7 @@ class Kernel implements KernelContract
     protected function gatherRouteMiddleware($request)
     {
         if ($route = $request->route()) {
-            return $this->router->gatherRouteMiddleware($route);
+            return $this->dispatcher->gatherRouteMiddleware($route);
         }
 
         return [];
