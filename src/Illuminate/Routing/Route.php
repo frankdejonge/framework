@@ -85,7 +85,7 @@ class Route
     /**
      * The compiled version of the route.
      *
-     * @var \Symfony\Component\Routing\CompiledRoute
+     * @var \Symfony\Component\Routing\Route
      */
     public $compiled;
 

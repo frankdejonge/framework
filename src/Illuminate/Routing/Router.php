@@ -4,12 +4,12 @@ namespace Illuminate\Routing;
 
 use Closure;
 use ArrayObject;
+use Illuminate\Contracts\Routing\RouteBindingSubstitutor;
 use JsonSerializable;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Collection;
 use Illuminate\Container\Container;
 use Illuminate\Support\Traits\Macroable;
 use Illuminate\Contracts\Support\Jsonable;
@@ -21,11 +21,15 @@ use Illuminate\Contracts\Routing\Registrar as RegistrarContract;
 use Symfony\Bridge\PsrHttpMessage\Factory\HttpFoundationFactory;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
-class Router implements RegistrarContract, BindingRegistrar
+class Router implements RegistrarContract, BindingRegistrar, RouteBindingSubstitutor
 {
     use Macroable {
         __call as macroCall;
     }
+
+    use HandlesBindings;
+
+    use HandlesMiddleware;
 
     /**
      * The event dispatcher instance.
@@ -61,36 +65,6 @@ class Router implements RegistrarContract, BindingRegistrar
      * @var \Illuminate\Http\Request
      */
     protected $currentRequest;
-
-    /**
-     * All of the short-hand keys for middlewares.
-     *
-     * @var array
-     */
-    protected $middleware = [];
-
-    /**
-     * All of the middleware groups.
-     *
-     * @var array
-     */
-    protected $middlewareGroups = [];
-
-    /**
-     * The priority-sorted list of middleware.
-     *
-     * Forces the listed middleware to always be in the given order.
-     *
-     * @var array
-     */
-    public $middlewarePriority = [];
-
-    /**
-     * The registered route value binders.
-     *
-     * @var array
-     */
-    protected $binders = [];
 
     /**
      * The globally available parameter patterns.
@@ -535,7 +509,7 @@ class Router implements RegistrarContract, BindingRegistrar
      */
     protected function findRoute($request)
     {
-        $this->current = $route = $this->routes->match($request);
+        $this->current = $route = $this->routes->match($request, $this->container);
 
         $this->container->instance(Route::class, $route);
 
@@ -567,32 +541,6 @@ class Router implements RegistrarContract, BindingRegistrar
     }
 
     /**
-     * Gather the middleware for the given route with resolved class names.
-     *
-     * @param  \Illuminate\Routing\Route  $route
-     * @return array
-     */
-    public function gatherRouteMiddleware(Route $route)
-    {
-        $middleware = collect($route->gatherMiddleware())->map(function ($name) {
-            return (array) MiddlewareNameResolver::resolve($name, $this->middleware, $this->middlewareGroups);
-        })->flatten();
-
-        return $this->sortMiddleware($middleware);
-    }
-
-    /**
-     * Sort the given middleware by priority.
-     *
-     * @param  \Illuminate\Support\Collection  $middlewares
-     * @return array
-     */
-    protected function sortMiddleware(Collection $middlewares)
-    {
-        return (new SortedMiddleware($this->middlewarePriority, $middlewares))->all();
-    }
-
-    /**
      * Create a response instance from the given value.
      *
      * @param  \Symfony\Component\HttpFoundation\Request  $request
@@ -604,58 +552,17 @@ class Router implements RegistrarContract, BindingRegistrar
         if ($response instanceof PsrResponseInterface) {
             $response = (new HttpFoundationFactory)->createResponse($response);
         } elseif (! $response instanceof SymfonyResponse &&
-                   ($response instanceof Arrayable ||
-                    $response instanceof Jsonable ||
-                    $response instanceof ArrayObject ||
-                    $response instanceof JsonSerializable ||
-                    is_array($response))) {
+            ($response instanceof Arrayable ||
+                $response instanceof Jsonable ||
+                $response instanceof ArrayObject ||
+                $response instanceof JsonSerializable ||
+                is_array($response))) {
             $response = new JsonResponse($response);
         } elseif (! $response instanceof SymfonyResponse) {
             $response = new Response($response);
         }
 
         return $response->prepare($request);
-    }
-
-    /**
-     * Substitute the route bindings onto the route.
-     *
-     * @param  \Illuminate\Routing\Route  $route
-     * @return \Illuminate\Routing\Route
-     */
-    public function substituteBindings($route)
-    {
-        foreach ($route->parameters() as $key => $value) {
-            if (isset($this->binders[$key])) {
-                $route->setParameter($key, $this->performBinding($key, $value, $route));
-            }
-        }
-
-        return $route;
-    }
-
-    /**
-     * Substitute the implicit Eloquent model bindings for the route.
-     *
-     * @param  \Illuminate\Routing\Route  $route
-     * @return void
-     */
-    public function substituteImplicitBindings($route)
-    {
-        ImplicitRouteBinding::resolveForRoute($this->container, $route);
-    }
-
-    /**
-     * Call the binding callback for the given key.
-     *
-     * @param  string  $key
-     * @param  string  $value
-     * @param  \Illuminate\Routing\Route  $route
-     * @return mixed
-     */
-    protected function performBinding($key, $value, $route)
-    {
-        return call_user_func($this->binders[$key], $value, $route);
     }
 
     /**
@@ -667,147 +574,6 @@ class Router implements RegistrarContract, BindingRegistrar
     public function matched($callback)
     {
         $this->events->listen(Events\RouteMatched::class, $callback);
-    }
-
-    /**
-     * Get all of the defined middleware short-hand names.
-     *
-     * @return array
-     */
-    public function getMiddleware()
-    {
-        return $this->middleware;
-    }
-
-    /**
-     * Register a short-hand name for a middleware.
-     *
-     * @param  string  $name
-     * @param  string  $class
-     * @return $this
-     */
-    public function aliasMiddleware($name, $class)
-    {
-        $this->middleware[$name] = $class;
-
-        return $this;
-    }
-
-    /**
-     * Check if a middlewareGroup with the given name exists.
-     *
-     * @param  string  $name
-     * @return bool
-     */
-    public function hasMiddlewareGroup($name)
-    {
-        return array_key_exists($name, $this->middlewareGroups);
-    }
-
-    /**
-     * Get all of the defined middleware groups.
-     *
-     * @return array
-     */
-    public function getMiddlewareGroups()
-    {
-        return $this->middlewareGroups;
-    }
-
-    /**
-     * Register a group of middleware.
-     *
-     * @param  string  $name
-     * @param  array  $middleware
-     * @return $this
-     */
-    public function middlewareGroup($name, array $middleware)
-    {
-        $this->middlewareGroups[$name] = $middleware;
-
-        return $this;
-    }
-
-    /**
-     * Add a middleware to the beginning of a middleware group.
-     *
-     * If the middleware is already in the group, it will not be added again.
-     *
-     * @param  string  $group
-     * @param  string  $middleware
-     * @return $this
-     */
-    public function prependMiddlewareToGroup($group, $middleware)
-    {
-        if (isset($this->middlewareGroups[$group]) && ! in_array($middleware, $this->middlewareGroups[$group])) {
-            array_unshift($this->middlewareGroups[$group], $middleware);
-        }
-
-        return $this;
-    }
-
-    /**
-     * Add a middleware to the end of a middleware group.
-     *
-     * If the middleware is already in the group, it will not be added again.
-     *
-     * @param  string  $group
-     * @param  string  $middleware
-     * @return $this
-     */
-    public function pushMiddlewareToGroup($group, $middleware)
-    {
-        if (! array_key_exists($group, $this->middlewareGroups)) {
-            $this->middlewareGroups[$group] = [];
-        }
-
-        if (! in_array($middleware, $this->middlewareGroups[$group])) {
-            $this->middlewareGroups[$group][] = $middleware;
-        }
-
-        return $this;
-    }
-
-    /**
-     * Add a new route parameter binder.
-     *
-     * @param  string  $key
-     * @param  string|callable  $binder
-     * @return void
-     */
-    public function bind($key, $binder)
-    {
-        $this->binders[str_replace('-', '_', $key)] = RouteBinding::forCallback(
-            $this->container, $binder
-        );
-    }
-
-    /**
-     * Register a model binder for a wildcard.
-     *
-     * @param  string  $key
-     * @param  string  $class
-     * @param  \Closure|null  $callback
-     * @return void
-     *
-     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
-     */
-    public function model($key, $class, Closure $callback = null)
-    {
-        $this->bind($key, RouteBinding::forModel($this->container, $class, $callback));
-    }
-
-    /**
-     * Get the binding callback for a given binding.
-     *
-     * @param  string  $key
-     * @return \Closure|null
-     */
-    public function getBindingCallback($key)
-    {
-        if (isset($this->binders[$key = str_replace('-', '_', $key)])) {
-            return $this->binders[$key];
-        }
     }
 
     /**
@@ -1072,10 +838,6 @@ class Router implements RegistrarContract, BindingRegistrar
      */
     public function setRoutes(RouteCollection $routes)
     {
-        foreach ($routes as $route) {
-            $route->setRouter($this)->setContainer($this->container);
-        }
-
         $this->routes = $routes;
 
         $this->container->instance('routes', $this->routes);

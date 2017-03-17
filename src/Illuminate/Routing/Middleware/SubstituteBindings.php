@@ -3,26 +3,26 @@
 namespace Illuminate\Routing\Middleware;
 
 use Closure;
-use Illuminate\Contracts\Routing\Registrar;
+use Illuminate\Contracts\Routing\RouteBindingSubstitutor;
 
 class SubstituteBindings
 {
     /**
      * The router instance.
      *
-     * @var \Illuminate\Contracts\Routing\Registrar
+     * @var \Illuminate\Contracts\Routing\RouteBindingSubstitutor
      */
-    protected $router;
+    protected $bindingSubstitutor;
 
     /**
      * Create a new bindings substitutor.
      *
-     * @param  \Illuminate\Contracts\Routing\Registrar  $router
+     * @param  \Illuminate\Contracts\Routing\RouteBindingSubstitutor $bindingSubstitutor
      * @return void
      */
-    public function __construct(Registrar $router)
+    public function __construct(RouteBindingSubstitutor $bindingSubstitutor)
     {
-        $this->router = $router;
+        $this->bindingSubstitutor = $bindingSubstitutor;
     }
 
     /**
@@ -34,9 +34,9 @@ class SubstituteBindings
      */
     public function handle($request, Closure $next)
     {
-        $this->router->substituteBindings($route = $request->route());
+        $this->bindingSubstitutor->substituteBindings($route = $request->route());
 
-        $this->router->substituteImplicitBindings($route);
+        $this->bindingSubstitutor->substituteImplicitBindings($route);
 
         return $next($request);
     }
