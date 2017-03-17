@@ -13,7 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\HandlesBindings;
 use Illuminate\Routing\HandlesMiddleware;
-use Illuminate\Routing\Dumped\DumpedRoute;
+use Illuminate\Routing\Route;
 use JsonSerializable;
 use Symfony\Component\Routing\Matcher\UrlMatcher as SymfonyUrlMatcher;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
@@ -43,6 +43,8 @@ abstract class UrlMatcher extends SymfonyUrlMatcher implements RequestDispatcher
         $match = $this->matchRequest($request);
 
         $route = new DumpedRoute([$request->method()], $this->context->getPathInfo(), $match);
+
+        $container->instance(Route::class, $route);
 
         $route->setContainer($container);
 
