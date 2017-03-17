@@ -25,6 +25,7 @@ use Illuminate\Session\Console\SessionTableCommand;
 use Illuminate\Foundation\Console\PolicyMakeCommand;
 use Illuminate\Foundation\Console\RouteCacheCommand;
 use Illuminate\Foundation\Console\RouteClearCommand;
+use Illuminate\Foundation\Console\RouteDumpCommand;
 use Illuminate\Console\Scheduling\ScheduleRunCommand;
 use Illuminate\Foundation\Console\ConfigCacheCommand;
 use Illuminate\Foundation\Console\ConfigClearCommand;
@@ -101,6 +102,7 @@ class ArtisanServiceProvider extends ServiceProvider
         'QueueWork' => 'command.queue.work',
         'RouteCache' => 'command.route.cache',
         'RouteClear' => 'command.route.clear',
+        'RouteDump' => 'command.route.dump',
         'RouteList' => 'command.route.list',
         'Seed' => 'command.seed',
         'ScheduleFinish' => ScheduleFinishCommand::class,
@@ -714,6 +716,18 @@ class ArtisanServiceProvider extends ServiceProvider
     {
         $this->app->singleton('command.route.cache', function ($app) {
             return new RouteCacheCommand($app['files']);
+        });
+    }
+
+    /**
+     * Register the command.
+     *
+     * @return void
+     */
+    protected function registerRouteDumpCommand()
+    {
+        $this->app->singleton('command.route.dump', function ($app) {
+            return new RouteDumpCommand($app['files']);
         });
     }
 
